@@ -173,6 +173,21 @@ func (h *HiClient) handleJSONCommand(ctx context.Context, req *JSONCommand) (any
 				Reason: params.Reason,
 			})
 		})
+	case "knock_room":
+		return unmarshalAndCall(req.Data, func(params *joinRoomParams) (*mautrix.RespKnockRoom, error) {
+			return h.Client.KnockRoom(ctx, params.RoomIDOrAlias, &mautrix.ReqKnockRoom{
+				Via:    params.Via,
+				Reason: params.Reason,
+			})
+		})
+	case "invite_user":
+		return unmarshalAndCall(req.Data, func(params *inviteUserParams) (bool, error) {
+			_, e := h.Client.InviteUser(ctx, params.RoomID, &mautrix.ReqInviteUser{
+				UserID: params.UserID,
+				Reason: params.Reason,
+			})
+			return e == nil, e
+		})
 	case "leave_room":
 		return unmarshalAndCall(req.Data, func(params *leaveRoomParams) (*mautrix.RespLeaveRoom, error) {
 			return h.Client.LeaveRoom(ctx, params.RoomID, &mautrix.ReqLeave{Reason: params.Reason})
@@ -444,4 +459,10 @@ type getReceiptsParams struct {
 type muteRoomParams struct {
 	RoomID id.RoomID `json:"room_id"`
 	Muted  bool      `json:"muted"`
+}
+
+type inviteUserParams struct {
+	RoomID id.RoomID `json:"room_id"`
+	UserID id.UserID `json:"user_id"`
+	Reason string    `json:"reason"`
 }

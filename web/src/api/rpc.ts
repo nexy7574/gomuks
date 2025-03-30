@@ -265,6 +265,14 @@ export default abstract class RPCClient {
 		return this.request("join_room", { room_id_or_alias, via, reason })
 	}
 
+	knockRoom(room_id_or_alias: RoomID | RoomAlias, via?: string[]): Promise<boolean> {
+		return this.request("knock_room", { room_id_or_alias, via })
+	}
+
+	inviteUser(roomID: RoomID, userID: UserID, reason?: string): Promise<boolean> {
+		return this.request("invite_user", { room_id: roomID, user_id: userID, reason: reason })
+	}
+
 	leaveRoom(room_id: RoomID, reason?: string): Promise<Record<string, never>> {
 		return this.request("leave_room", { room_id, reason })
 	}
