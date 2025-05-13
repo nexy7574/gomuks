@@ -20,6 +20,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.mau.fi/util/dbutil"
+	_ "go.mau.fi/util/dbutil/litestream"
 	"go.mau.fi/util/exerrors"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/crypto"
@@ -28,6 +29,7 @@ import (
 	"maunium.net/go/mautrix/pushrules"
 
 	"go.mau.fi/gomuks/pkg/hicli/database"
+	"go.mau.fi/gomuks/pkg/hicli/jsoncmd"
 )
 
 type HiClient struct {
@@ -46,7 +48,7 @@ type HiClient struct {
 	KeyBackupKey     *backup.MegolmBackupKey
 
 	PushRules  atomic.Pointer[pushrules.PushRuleset]
-	SyncStatus atomic.Pointer[SyncStatus]
+	SyncStatus atomic.Pointer[jsoncmd.SyncStatus]
 	syncErrors int
 	lastSync   time.Time
 
@@ -60,6 +62,7 @@ type HiClient struct {
 	syncLock          sync.Mutex
 	stopSync          atomic.Pointer[context.CancelFunc]
 	encryptLock       sync.Mutex
+	loginLock         sync.Mutex
 
 	requestQueueWakeup chan struct{}
 
@@ -69,6 +72,12 @@ type HiClient struct {
 	paginationInterrupterLock sync.Mutex
 	paginationInterrupter     map[id.RoomID]context.CancelCauseFunc
 }
+
+var (
+	_ mautrix.StateStore        = (*database.ClientStateStore)(nil)
+	_ mautrix.StateStoreUpdater = (*database.ClientStateStore)(nil)
+	_ crypto.StateStore         = (*database.ClientStateStore)(nil)
+)
 
 var ErrTimelineReset = errors.New("got limited timeline sync response")
 
@@ -121,6 +130,9 @@ func New(rawDB, cryptoDB *dbutil.Database, log zerolog.Logger, pickleKey []byte,
 		Store:      (*hiStore)(c),
 		StateStore: c.ClientStore,
 		Log:        log.With().Str("component", "mautrix client").Logger(),
+
+		DefaultHTTPBackoff: 1 * time.Second,
+		DefaultHTTPRetries: 6,
 	}
 	c.CryptoStore = crypto.NewSQLCryptoStore(cryptoDB, dbutil.ZeroLogger(log.With().Str("db_section", "crypto").Logger()), "", "", pickleKey)
 	cryptoLog := log.With().Str("component", "crypto").Logger()
@@ -128,6 +140,7 @@ func New(rawDB, cryptoDB *dbutil.Database, log zerolog.Logger, pickleKey []byte,
 	c.Crypto.SessionReceived = c.handleReceivedMegolmSession
 	c.Crypto.DisableRatchetTracking = true
 	c.Crypto.DisableDecryptKeyFetching = true
+	c.Crypto.IgnorePostDecryptionParseErrors = true
 	c.Client.Crypto = (*hiCryptoHelper)(c)
 	return c
 }

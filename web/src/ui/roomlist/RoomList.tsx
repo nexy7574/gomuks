@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import React, { use, useCallback, useRef, useState } from "react"
-import { RoomListFilter, Space as SpaceStore, SpaceUnreadCounts } from "@/api/statestore"
+import { RoomListFilter, Space as SpaceStore, SpaceUnreadCounts, usePreference } from "@/api/statestore"
 import type { RoomID } from "@/api/types"
 import { useEventAsState } from "@/util/eventdispatcher.ts"
 import reverseMap from "@/util/reversemap.ts"
@@ -22,9 +22,12 @@ import toSearchableString from "@/util/searchablestring.ts"
 import ClientContext from "../ClientContext.ts"
 import MainScreenContext from "../MainScreenContext.ts"
 import { keyToString } from "../keybindings.ts"
+import { ModalContext } from "../modal"
+import CreateRoomView from "../roomview/CreateRoomView.tsx"
 import Entry from "./Entry.tsx"
 import FakeSpace from "./FakeSpace.tsx"
 import Space from "./Space.tsx"
+import AddCircleIcon from "@/icons/add-circle.svg?react"
 import CloseIcon from "@/icons/close.svg?react"
 import SearchIcon from "@/icons/search.svg?react"
 import "./RoomList.css"
@@ -36,6 +39,7 @@ interface RoomListProps {
 
 const RoomList = ({ activeRoomID, space }: RoomListProps) => {
 	const client = use(ClientContext)!
+	const openModal = use(ModalContext)
 	const mainScreen = use(MainScreenContext)
 	const roomList = useEventAsState(client.store.roomList)
 	const spaces = useEventAsState(client.store.topLevelSpaces)
@@ -45,6 +49,14 @@ const RoomList = ({ activeRoomID, space }: RoomListProps) => {
 	const setQuery = (evt: React.ChangeEvent<HTMLInputElement>) => {
 		client.store.currentRoomListQuery = toSearchableString(evt.target.value)
 		directSetQuery(evt.target.value)
+	}
+	const openCreateRoom = () => {
+		openModal({
+			dimmed: true,
+			boxed: true,
+			boxClass: "create-room-view-modal",
+			content: <CreateRoomView />,
+		})
 	}
 	const onClickSpace = useCallback((evt: React.MouseEvent<HTMLDivElement>) => {
 		const store = client.store.getSpaceStore(evt.currentTarget.getAttribute("data-target-space")!)
@@ -103,6 +115,7 @@ const RoomList = ({ activeRoomID, space }: RoomListProps) => {
 		}
 	}
 
+	const showInviteAvatars = usePreference(client.store, null, "show_invite_avatars")
 	const roomListFilter = client.store.roomListFilterFunc
 	return <div className="room-list-wrapper">
 		<div className="room-search-wrapper">
@@ -116,6 +129,9 @@ const RoomList = ({ activeRoomID, space }: RoomListProps) => {
 				ref={searchInputRef}
 				id="room-search"
 			/>
+			{query === "" && <button onClick={openCreateRoom} title="Create room">
+				<AddCircleIcon/>
+			</button>}
 			<button onClick={clearQuery} disabled={query === ""}>
 				{query !== "" ? <CloseIcon/> : <SearchIcon/>}
 			</button>
@@ -145,6 +161,7 @@ const RoomList = ({ activeRoomID, space }: RoomListProps) => {
 					isActive={room.room_id === activeRoomID}
 					hidden={roomListFilter ? !roomListFilter(room) : false}
 					room={room}
+					hideAvatar={room.is_invite && !showInviteAvatars}
 				/>,
 			)}
 		</div>

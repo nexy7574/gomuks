@@ -47,6 +47,12 @@ export const preferences = {
 		allowedContexts: anyContext,
 		defaultValue: true,
 	}),
+	send_bundled_url_previews: new Preference<boolean>({
+		displayName: "Send bundled URL previews",
+		description: "Should the composer offer fetching URL previews to bundle in outgoing messages?",
+		allowedContexts: anyContext,
+		defaultValue: true,
+	}),
 	display_read_receipts: new Preference<boolean>({
 		displayName: "Display read receipts",
 		description: "Should read receipts be rendered in the timeline?",
@@ -55,9 +61,21 @@ export const preferences = {
 	}),
 	show_media_previews: new Preference<boolean>({
 		displayName: "Show image and video previews",
-		description: "If disabled, images and videos will only be visible after clicking and will not be downloaded automatically.",
+		description: "If disabled, images and videos will only be visible after clicking and will not be downloaded automatically. This will also disable images in URL previews.",
+		allowedContexts: anyContext,
+		defaultValue: false,
+	}),
+	show_inline_images: new Preference<boolean>({
+		displayName: "Show inline images",
+		description: "If disabled, custom emojis and other inline images will not be rendered and the alt attribute will be shown instead.",
 		allowedContexts: anyContext,
 		defaultValue: true,
+	}),
+	show_invite_avatars: new Preference<boolean>({
+		displayName: "Show avatars in invites",
+		description: "If disabled, the avatar of the room or inviter will not be shown in the invite view.",
+		allowedContexts: anyGlobalContext,
+		defaultValue: false,
 	}),
 	code_block_line_wrap: new Preference<boolean>({
 		displayName: "Code block line wrap",
@@ -123,6 +141,12 @@ export const preferences = {
 	show_room_emoji_packs: new Preference<boolean>({
 		displayName: "Show room emoji packs",
 		description: "Whether to show custom emoji packs provided by the room. If disabled, only your personal packs are shown in all rooms.",
+		allowedContexts: anyContext,
+		defaultValue: true,
+	}),
+	upload_dialog: new Preference<boolean>({
+		displayName: "Show upload dialog",
+		description: "Whether to show the dialog that allows adjusting the media before upload (re-encoding, resizing, etc)",
 		allowedContexts: anyContext,
 		defaultValue: true,
 	}),

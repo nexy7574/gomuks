@@ -188,6 +188,13 @@ div.timeline-event {
 			"avatar                       gap                        content  status" auto
 			/ var(--timeline-avatar-size) var(--timeline-avatar-gap) 1fr      var(--timeline-status-size);
 	}
+
+	div.url-previews {
+		display: flex;
+		flex-direction: row;
+		gap: 1rem;
+		overflow-x: auto;
+	}
 }
 
 div.pinned-event > div.timeline-event {
@@ -240,16 +247,28 @@ div.event-content > div.event-reactions {
 		overflow: hidden;
 		max-width: 20rem;
 
+		user-select: none;
+		cursor: var(--clickable-cursor);
+
+		&:hover {
+			background-color: var(--light-hover-color);
+		}
+
 		> img.reaction-emoji {
 			height: 1.5rem;
 		}
 	}
 }
 
+blockquote.reply-body.small > div.reply-sender > span.event-sender {
+	max-width: 10rem;
+}
+
 div.small-event > div.sender-avatar, blockquote.reply-body > div.reply-sender > div.sender-avatar {
 	margin-top: 0;
 	display: flex;
 	align-items: center;
+	flex-shrink: 0;
 }
 
 div.date-separator {

@@ -90,6 +90,11 @@
 	--timeline-horizontal-padding: 1.5rem;
 	--timeline-status-size: 4rem;
 
+	--image-picker-width: 22rem;
+	/* Note: this must be a constant rem or px value (no references to other variables or anything else) */
+	--image-picker-height: 34rem;
+	--image-picker-category-rows: 3;
+
 	@media screen and (max-width: 45rem) {
 		--timeline-horizontal-padding: .5rem;
 		--timeline-status-size: 2.25rem;
@@ -167,7 +172,6 @@ body {
 	padding: 0;
 	background-color: var(--background-color);
 	line-height: 1.5;
-	font-size: 16px;
 	touch-action: none;
 	color: var(--text-color);
 	min-height: 100vh;
@@ -176,6 +180,7 @@ body {
 html {
 	touch-action: none;
 	background-color: var(--background-color);
+	font-size: 16px;
 }
 
 #root {
@@ -195,6 +200,7 @@ input, textarea {
 	color: inherit;
 	background-color: inherit;
 	font-size: 1em;
+	font-family: var(--font-stack);
 }
 
 button, a.button, span.button {

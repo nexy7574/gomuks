@@ -16,6 +16,7 @@
 import { use, useEffect, useState } from "react"
 import { ScaleLoader } from "react-spinners"
 import { getAvatarThumbnailURL, getAvatarURL, getRoomAvatarURL } from "@/api/media.ts"
+import { usePreference } from "@/api/statestore/hooks.ts"
 import { InvitedRoomStore } from "@/api/statestore/invitedroom.ts"
 import { RoomID, RoomSummary } from "@/api/types"
 import { getDisplayname, getServerName } from "@/util/validation.ts"
@@ -41,6 +42,21 @@ const RoomPreview = ({ roomID, via, alias, invite }: RoomPreviewProps) => {
 	const [loading, setLoading] = useState(false)
 	const [buttonClicked, setButtonClicked] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [knockRequest, setKnockRequest] = useState<string>("")
+	const doKnockRoom = () => {
+		setButtonClicked(true)
+		client.rpc.knockRoom(alias || roomID, alias ? undefined : via, knockRequest || undefined).then(
+			() => {
+				setButtonClicked(false)
+				mainScreen.clearActiveRoom()
+				window.alert("Successfully knocked on room")
+			},
+			err => {
+				setError(`Failed to knock: ${err}`)
+				setButtonClicked(false)
+			},
+		)
+	}
 	const doJoinRoom = () => {
 		let realVia = via
 		if (!via?.length && invite?.invited_by) {
@@ -84,13 +100,21 @@ const RoomPreview = ({ roomID, via, alias, invite }: RoomPreviewProps) => {
 	const name = summary?.name ?? summary?.canonical_alias ?? invite?.name ?? invite?.canonical_alias ?? alias ?? roomID
 	const memberCount = summary?.num_joined_members || null
 	const topic = summary?.topic ?? invite?.topic ?? ""
+	const showInviteAvatars = usePreference(client.store, null, "show_invite_avatars")
+	const noAvatarPreview = invite && !showInviteAvatars
+	const joinRule = summary?.join_rule ?? invite?.join_rule ?? "invite"
+	const allowKnock = ["knock", "knock_restricted"].includes(joinRule) && !invite
+	const requiresKnock = joinRule === "knock_restricted" && !invite
+		&& (summary?.allowed_room_ids ?? []).findIndex(roomID => client.store.rooms.has(roomID)) !== -1
+	const acceptAction = invite ? "Accept" : "Join room"
+
 	return <div className="room-view preview">
 		<div className="preview-inner">
 			{invite?.invited_by && !invite.dm_user_id ? <div className="inviter-info">
 				<img
 					className="small avatar"
 					onClick={use(LightboxContext)}
-					src={getAvatarThumbnailURL(invite.invited_by, invite.inviter_profile)}
+					src={getAvatarThumbnailURL(invite.invited_by, invite.inviter_profile, noAvatarPreview)}
 					data-full-src={getAvatarURL(invite.invited_by, invite.inviter_profile)}
 					alt=""
 				/>
@@ -102,7 +126,8 @@ const RoomPreview = ({ roomID, via, alias, invite }: RoomPreviewProps) => {
 			<h2 className="room-name">{name}</h2>
 			<img
 				// this is a big avatar (120px), use full resolution
-				src={getRoomAvatarURL(invite ?? summary ?? { room_id: roomID })}
+				src={getRoomAvatarURL(invite ?? summary ?? { room_id: roomID }, undefined, false, noAvatarPreview)}
+				data-full-src={getRoomAvatarURL(invite ?? summary ?? { room_id: roomID })}
 				className="large avatar"
 				onClick={use(LightboxContext)}
 				alt=""
@@ -148,17 +173,28 @@ const RoomPreview = ({ roomID, via, alias, invite }: RoomPreviewProps) => {
 				</table>
 			</details>}
 			{invite?.invited_by && <MutualRooms client={client} userID={invite.invited_by}/>}
+			{allowKnock && <input
+				className="knock-reason"
+				onChange={event => setKnockRequest(event.currentTarget.value)}
+				placeholder="Why do you want to join this room?"
+				value={knockRequest}
+			/>}
 			<div className="buttons">
 				{invite && <button
 					disabled={buttonClicked}
 					className="reject"
 					onClick={doRejectInvite}
 				>Reject</button>}
-				<button
+				{!requiresKnock && <button
 					disabled={buttonClicked}
 					className="primary-color-button"
 					onClick={doJoinRoom}
-				>{invite ? "Accept" : "Join room"}</button>
+				>{acceptAction}</button>}
+				{allowKnock && <button
+					disabled={buttonClicked}
+					className="primary-color-button"
+					onClick={doKnockRoom}
+				>Ask to join</button>}
 			</div>
 			{error && <div className="error">
 				<ErrorIcon color="var(--error-color)"/>

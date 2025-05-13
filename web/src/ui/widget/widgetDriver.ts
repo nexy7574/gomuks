@@ -19,11 +19,13 @@ import {
 	IOpenIDUpdate,
 	IRoomAccountData,
 	IRoomEvent,
+	ISendDelayedEventDetails,
 	ISendEventDetails,
 	ITurnServer,
 	OpenIDRequestState,
 	SimpleObservable,
 	Symbols,
+	UpdateDelayedEventAction,
 	WidgetDriver,
 } from "matrix-widget-api"
 import Client from "@/api/client.ts"
@@ -35,12 +37,16 @@ class GomuksWidgetDriver extends WidgetDriver {
 	private openIDToken: IOpenIDCredentials | null = null
 	private openIDExpiry: number | null = null
 
-	constructor(private client: Client, private room: RoomStateStore) {
+	constructor(
+		private client: Client,
+		private room: RoomStateStore,
+		private openPermissionPrompt: (requested: Set<string>) => Promise<Set<string>>,
+	) {
 		super()
 	}
 
 	async validateCapabilities(requested: Set<string>): Promise<Set<string>> {
-		return new Set(requested)
+		return this.openPermissionPrompt(requested)
 	}
 
 	async sendEvent(
@@ -62,23 +68,31 @@ class GomuksWidgetDriver extends WidgetDriver {
 		}
 	}
 
-	// async sendDelayedEvent(
-	// 	delay: number | null,
-	// 	parentDelayID: string | null,
-	// 	eventType: string,
-	// 	content: unknown,
-	// 	stateKey: string | null = null,
-	// 	roomID: string | null = null,
-	// ): Promise<ISendDelayedEventDetails> {
-	// 	if (!isRecord(content)) {
-	// 		throw new Error("Content must be an object")
-	// 	}
-	// 	throw new Error("Delayed events are not supported")
-	// }
+	async sendDelayedEvent(
+		delay: number | null,
+		parentDelayID: string | null,
+		eventType: string,
+		content: unknown,
+		stateKey: string | null = null,
+		roomID: string | null = null,
+	): Promise<ISendDelayedEventDetails> {
+		if (!isRecord(content)) {
+			throw new Error("Content must be an object")
+		} else if (stateKey === null) {
+			throw new Error("Non-state delayed events are not supported")
+		} else if (parentDelayID !== null) {
+			throw new Error("Parent delayed events are not supported")
+		} else if (!delay) {
+			throw new Error("Delay must be a number")
+		}
+		roomID = roomID ?? this.room.roomID
+		const delayID = await this.client.rpc.setState(roomID, eventType, stateKey, content, { delay_ms: delay })
+		return { delayId: delayID, roomId: roomID }
+	}
 
-	// async updateDelayedEvent(delayID: string, action: UpdateDelayedEventAction): Promise<void> {
-	// 	throw new Error("Delayed events are not supported")
-	// }
+	async updateDelayedEvent(delayID: string, action: UpdateDelayedEventAction): Promise<void> {
+		await this.client.rpc.updateDelayedEvent(delayID, action)
+	}
 
 	async sendToDevice(
 		eventType: string,

@@ -17,11 +17,9 @@ import { use } from "react"
 import Client from "@/api/client.ts"
 import { useRoomState } from "@/api/statestore"
 import { MemDBEvent } from "@/api/types"
-import { ModalCloseContext, ModalContext } from "../modal"
+import { ConfirmWithMessageModal, ModalCloseContext, ModalContext, ShareModal } from "../modal"
 import { RoomContext, RoomContextData } from "../roomview/roomcontext.ts"
 import JSONView from "../util/JSONView.tsx"
-import ConfirmWithMessageModal from "./ConfirmWithMessageModal.tsx"
-import ShareModal from "./ShareModal.tsx"
 import { getPending, getPowerLevels } from "./util.ts"
 import ViewSourceIcon from "@/icons/code.svg?react"
 import DeleteIcon from "@/icons/delete.svg?react"
@@ -50,7 +48,6 @@ export const useSecondaryItems = (
 		openModal({
 			dimmed: true,
 			boxed: true,
-			innerBoxClass: "confirm-message-modal",
 			content: <RoomContext value={roomCtx}>
 				<ConfirmWithMessageModal
 					evt={evt}
@@ -70,7 +67,6 @@ export const useSecondaryItems = (
 		openModal({
 			dimmed: true,
 			boxed: true,
-			innerBoxClass: "confirm-message-modal",
 			content: <RoomContext value={roomCtx}>
 				<ConfirmWithMessageModal
 					evt={evt}
@@ -109,15 +105,15 @@ export const useSecondaryItems = (
 			const isRoomIDLink = true
 			let generatedURL = useMatrixTo ? "https://matrix.to/#/" : "matrix:roomid/"
 			if (useMatrixTo) {
-				generatedURL += evt.room_id
+				generatedURL += encodeURIComponent(evt.room_id)
 			} else {
-				generatedURL += `${evt.room_id.slice(1)}`
+				generatedURL += encodeURIComponent(`${evt.room_id.slice(1)}`)
 			}
 			if (includeEvent) {
 				if (useMatrixTo) {
-					generatedURL += `/${evt.event_id}`
+					generatedURL += `/${encodeURIComponent(evt.event_id)}`
 				} else {
-					generatedURL += `/e/${evt.event_id.slice(1)}`
+					generatedURL += `/e/${encodeURIComponent(evt.event_id.slice(1))}`
 				}
 			}
 			if (isRoomIDLink) {
@@ -130,12 +126,9 @@ export const useSecondaryItems = (
 		openModal({
 			dimmed: true,
 			boxed: true,
-			innerBoxClass: "confirm-message-modal",
 			content: <RoomContext value={roomCtx}>
 				<ShareModal
 					evt={evt}
-					title="Share Message"
-					confirmButton="Copy to clipboard"
 					onConfirm={(useMatrixTo: boolean, includeEvent: boolean) => {
 						navigator.clipboard.writeText(generateLink(useMatrixTo, includeEvent)).catch(
 							err => window.alert(`Failed to copy link: ${err}`),

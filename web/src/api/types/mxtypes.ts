@@ -22,7 +22,7 @@ export type ContentURI = string
 export type RoomAlias = string
 export type ReceiptType = "m.read" | "m.read.private"
 export type RoomVersion = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11"
-export type RoomType = "" | "m.space"
+export type RoomType = "" | "m.space" | "support.feline.policy.lists.msc.v1" | "org.matrix.msc3417.call"
 export type RelationType = "m.annotation" | "m.reference" | "m.replace" | "m.thread"
 
 export type JSONValue =
@@ -102,6 +102,11 @@ export interface RoomNameEventContent {
 	name?: string
 }
 
+export interface RoomCanonicalAliasEventContent {
+	alias?: RoomAlias | null
+	alt_aliases?: RoomAlias[]
+}
+
 export interface RoomTopicEventContent {
 	topic?: string
 }
@@ -116,6 +121,9 @@ export interface PolicyRuleContent {
 	entity: string
 	reason: string
 	recommendation: string
+	"org.matrix.msc4205.hashes"?: {
+		sha256: string
+	}
 }
 
 export interface PowerLevelEventContent {
@@ -244,6 +252,8 @@ export interface MediaInfo {
 
 	"fi.mau.hide_controls"?: boolean
 	"fi.mau.loop"?: boolean
+	"fi.mau.autoplay"?: boolean
+	"fi.mau.no_audio"?: boolean
 	"xyz.amorgan.blurhash"?: string
 }
 
@@ -308,6 +318,7 @@ export interface RoomSummary {
 	room_type: RoomType
 	topic?: string
 	world_readable: boolean
+	allowed_room_ids?: RoomID[]
 }
 
 export interface RespRoomJoin {
@@ -324,6 +335,12 @@ export interface RespOpenIDToken {
 export type RoomVisibility = "public" | "private"
 export type RoomPreset = "private_chat" | "public_chat" | "trusted_private_chat"
 
+export interface CreateRoomInitialState {
+	type: EventType
+	state_key?: string
+	content: Record<string, unknown>
+}
+
 export interface ReqCreateRoom {
 	visibility?: RoomVisibility
 	room_alias_name?: string
@@ -332,11 +349,7 @@ export interface ReqCreateRoom {
 	invite?: UserID[]
 	preset?: RoomPreset
 	is_direct?: boolean
-	initial_state?: {
-		type: EventType
-		state_key?: string
-		content: Record<string, unknown>
-	}[]
+	initial_state?: CreateRoomInitialState[]
 	room_version?: string
 	creation_content?: Record<string, unknown>
 	power_level_content_override?: Record<string, unknown>

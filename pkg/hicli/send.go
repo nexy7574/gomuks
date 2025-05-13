@@ -16,6 +16,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 	"go.mau.fi/util/jsontime"
 	"go.mau.fi/util/ptr"
 	"maunium.net/go/mautrix"
@@ -26,12 +27,13 @@ import (
 	"maunium.net/go/mautrix/id"
 
 	"go.mau.fi/gomuks/pkg/hicli/database"
+	"go.mau.fi/gomuks/pkg/hicli/jsoncmd"
 	"go.mau.fi/gomuks/pkg/rainbow"
 )
 
 var (
-	rainbowWithHTML = goldmark.New(format.Extensions, goldmark.WithExtensions(mdext.Math, mdext.CustomEmoji), format.HTMLOptions, goldmark.WithExtensions(rainbow.Extension))
-	defaultNoHTML   = goldmark.New(format.Extensions, goldmark.WithExtensions(mdext.Math, mdext.CustomEmoji, mdext.EscapeHTML), format.HTMLOptions)
+	rainbowWithHTML = goldmark.New(format.Extensions, goldmark.WithExtensions(mdext.Math, mdext.CustomEmoji, extension.TaskList), format.HTMLOptions, goldmark.WithExtensions(rainbow.Extension))
+	defaultNoHTML   = goldmark.New(format.Extensions, goldmark.WithExtensions(mdext.Math, mdext.CustomEmoji, mdext.EscapeHTML, extension.TaskList), format.HTMLOptions)
 )
 
 var htmlToMarkdownForInput = ptr.Clone(format.MarkdownHTMLParser)
@@ -70,6 +72,7 @@ func (h *HiClient) SendMessage(
 	text string,
 	relatesTo *event.RelatesTo,
 	mentions *event.Mentions,
+	urlPreviews *[]*event.BeeperLinkPreview,
 ) (*database.Event, error) {
 	if text == "/discardsession" {
 		err := h.CryptoStore.RemoveOutboundGroupSession(ctx, roomID)
@@ -110,6 +113,11 @@ func (h *HiClient) SendMessage(
 		_, err := h.SetState(ctx, roomID, event.Type{Type: parts[1], Class: event.StateEventType}, parts[2], content)
 		return nil, err
 	}
+	var rawInputBody bool
+	if strings.HasPrefix(text, "/rawinputbody ") {
+		text = strings.TrimPrefix(text, "/rawinputbody ")
+		rawInputBody = true
+	}
 	var content event.MessageEventContent
 	msgType := event.MsgText
 	origText := text
@@ -129,10 +137,12 @@ func (h *HiClient) SendMessage(
 		content = format.TextToContent(text)
 	} else if strings.HasPrefix(text, "/html ") {
 		text = strings.TrimPrefix(text, "/html ")
-		text = strings.Replace(text, "\n", "<br>", -1)
-		content = format.HTMLToContent(text)
+		content = format.HTMLToContent(strings.Replace(text, "\n", "<br>", -1))
 	} else if text != "" {
 		content = format.RenderMarkdownCustom(text, defaultNoHTML)
+	}
+	if rawInputBody {
+		content.Body = text
 	}
 	content.MsgType = msgType
 	if base != nil {
@@ -140,6 +150,7 @@ func (h *HiClient) SendMessage(
 			base.Body = content.Body
 			base.Format = content.Format
 			base.FormattedBody = content.FormattedBody
+			base.Mentions = content.Mentions
 		}
 		content = *base
 	}
@@ -153,6 +164,9 @@ func (h *HiClient) SendMessage(
 				content.Mentions.Add(userID)
 			}
 		}
+	}
+	if urlPreviews != nil {
+		content.BeeperLinkPreviews = *urlPreviews
 	}
 	if relatesTo != nil {
 		if relatesTo.Type == event.RelReplace {
@@ -226,6 +240,7 @@ func (h *HiClient) SetState(
 	evtType event.Type,
 	stateKey string,
 	content any,
+	extra ...mautrix.ReqSendEvent,
 ) (id.EventID, error) {
 	room, err := h.DB.Room.Get(ctx, roomID)
 	if err != nil {
@@ -233,9 +248,13 @@ func (h *HiClient) SetState(
 	} else if room == nil {
 		return "", fmt.Errorf("unknown room")
 	}
-	resp, err := h.Client.SendStateEvent(ctx, room.ID, evtType, stateKey, content)
+	resp, err := h.Client.SendStateEvent(ctx, room.ID, evtType, stateKey, content, extra...)
 	if err != nil {
 		return "", err
+	}
+	if resp.UnstableDelayID != "" {
+		// Mildly hacky, but it's fine'
+		return id.EventID(resp.UnstableDelayID), nil
 	}
 	return resp.EventID, nil
 }
@@ -360,7 +379,7 @@ func (h *HiClient) actuallySend(ctx context.Context, room *database.Room, dbEvt 
 			}
 		}
 		if !synchronous {
-			h.EventHandler(&SendComplete{
+			h.EventHandler(&jsoncmd.SendComplete{
 				Event: dbEvt,
 				Error: err,
 			})
@@ -510,6 +529,9 @@ func (h *HiClient) shouldShareKeysToInvitedUsers(ctx context.Context, roomID id.
 	historyVisibility, err := h.DB.CurrentState.Get(ctx, roomID, event.StateHistoryVisibility, "")
 	if err != nil {
 		zerolog.Ctx(ctx).Err(err).Msg("Failed to get history visibility event")
+		return false
+	} else if historyVisibility == nil {
+		zerolog.Ctx(ctx).Warn().Msg("History visibility event not found")
 		return false
 	}
 	mautrixEvt := historyVisibility.AsRawMautrix()

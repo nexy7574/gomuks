@@ -13,9 +13,10 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import { use } from "react"
+import React, { use } from "react"
 import { getRoomAvatarThumbnailURL, getRoomAvatarURL } from "@/api/media.ts"
 import { RoomStateStore } from "@/api/statestore"
+import { getModalStyleFromButton } from "@/ui/menu/util.ts"
 import { useEventAsState } from "@/util/eventdispatcher.ts"
 import MainScreenContext from "../MainScreenContext.ts"
 import { LightboxContext, NestableModalContext } from "../modal"
@@ -24,6 +25,7 @@ import SettingsView from "../settings/SettingsView.tsx"
 import BackIcon from "@/icons/back.svg?react"
 import CodeIcon from "@/icons/code.svg?react"
 import PeopleIcon from "@/icons/group.svg?react"
+import MoreIcon from "@/icons/more.svg?react"
 import PinIcon from "@/icons/pin.svg?react"
 import SettingsIcon from "@/icons/settings.svg?react"
 import WidgetIcon from "@/icons/widgets.svg?react"
@@ -36,9 +38,9 @@ interface RoomViewHeaderProps {
 const RoomViewHeader = ({ room }: RoomViewHeaderProps) => {
 	const roomMeta = useEventAsState(room.meta)
 	const mainScreen = use(MainScreenContext)
-	const openModal = use(NestableModalContext)
+	const openNestableModal = use(NestableModalContext)
 	const openSettings = () => {
-		openModal({
+		openNestableModal({
 			dimmed: true,
 			boxed: true,
 			innerBoxClass: "settings-view",
@@ -46,11 +48,51 @@ const RoomViewHeader = ({ room }: RoomViewHeaderProps) => {
 		})
 	}
 	const openRoomStateExplorer = () => {
-		openModal({
+		openNestableModal({
 			dimmed: true,
 			boxed: true,
 			innerBoxClass: "room-state-explorer-box",
 			content: <RoomStateExplorer room={room} />,
+		})
+	}
+	const buttonCount = 5
+	const makeButtons = (titles?: boolean)  => {
+		let rightPanelOpener = mainScreen.clickRightPanelOpener
+		if (titles) {
+			rightPanelOpener = (evt: React.MouseEvent) => {
+				window.closeNestableModal()
+				mainScreen.clickRightPanelOpener(evt)
+			}
+		}
+		return <>
+			<button
+				data-target-panel="pinned-messages"
+				onClick={rightPanelOpener}
+				title="Pinned Messages"
+			><PinIcon/>{titles && "Pinned Messages"}</button>
+			<button
+				data-target-panel="members"
+				onClick={rightPanelOpener}
+				title="Room Members"
+			><PeopleIcon/>{titles && "Room Members"}</button>
+			<button
+				data-target-panel="widgets"
+				onClick={rightPanelOpener}
+				title="Widgets in room"
+			><WidgetIcon/>{titles && "Widgets in room"}</button>
+			<button title="Explore room state" onClick={openRoomStateExplorer}>
+				<CodeIcon/>{titles && "Explore room state"}
+			</button>
+			<button title="Room Settings" onClick={openSettings}>
+				<SettingsIcon/>{titles && "Room Settings"}
+			</button>
+		</>
+	}
+	const openButtonContextMenu = (evt: React.MouseEvent<HTMLButtonElement>) => {
+		openNestableModal({
+			content: <div className="context-menu" style={getModalStyleFromButton(evt.currentTarget, buttonCount * 16)}>
+				{makeButtons(true)}
+			</div>,
 		})
 	}
 	return <div className="room-header">
@@ -71,24 +113,9 @@ const RoomViewHeader = ({ room }: RoomViewHeaderProps) => {
 				{roomMeta.topic}
 			</div>}
 		</div>
-		<div className="right-buttons">
-			<button
-				data-target-panel="pinned-messages"
-				onClick={mainScreen.clickRightPanelOpener}
-				title="Pinned Messages"
-			><PinIcon/></button>
-			<button
-				data-target-panel="members"
-				onClick={mainScreen.clickRightPanelOpener}
-				title="Room Members"
-			><PeopleIcon/></button>
-			<button
-				data-target-panel="widgets"
-				onClick={mainScreen.clickRightPanelOpener}
-				title="Widgets in room"
-			><WidgetIcon/></button>
-			<button title="Explore room state" onClick={openRoomStateExplorer}><CodeIcon/></button>
-			<button title="Room Settings" onClick={openSettings}><SettingsIcon/></button>
+		<div className="right-buttons big-screen">{makeButtons()}</div>
+		<div className="right-buttons small-screen">
+			<button onClick={openButtonContextMenu}><MoreIcon/></button>
 		</div>
 	</div>
 }

@@ -46,6 +46,7 @@ import type {
 	RoomStateGUID,
 	RoomSummary,
 	TimelineRowID,
+	URLPreview,
 	UserID,
 	UserProfile,
 } from "./types"
@@ -71,6 +72,7 @@ export interface SendMessageParams {
 	media_path?: string
 	relates_to?: RelatesTo
 	mentions?: Mentions
+	url_previews?: URLPreview[]
 }
 
 export default abstract class RPCClient {
@@ -174,8 +176,13 @@ export default abstract class RPCClient {
 
 	setState(
 		room_id: RoomID, type: EventType, state_key: string, content: Record<string, unknown>,
+		extra: { delay_ms?: number } = {},
 	): Promise<EventID> {
-		return this.request("set_state", { room_id, type, state_key, content })
+		return this.request("set_state", { room_id, type, state_key, content, ...extra })
+	}
+
+	updateDelayedEvent(delay_id: string, action: string): Promise<void> {
+		return this.request("update_delayed_event", { delay_id, action })
 	}
 
 	setMembership(room_id: RoomID, user_id: UserID, action: MembershipAction, reason?: string): Promise<void> {
@@ -258,6 +265,10 @@ export default abstract class RPCClient {
 
 	joinRoom(room_id_or_alias: RoomID | RoomAlias, via?: string[], reason?: string): Promise<RespRoomJoin> {
 		return this.request("join_room", { room_id_or_alias, via, reason })
+	}
+
+	knockRoom(room_id_or_alias: RoomID | RoomAlias, via?: string[], reason?: string): Promise<RespRoomJoin> {
+		return this.request("knock_room", { room_id_or_alias, via, reason })
 	}
 
 	leaveRoom(room_id: RoomID, reason?: string): Promise<Record<string, never>> {

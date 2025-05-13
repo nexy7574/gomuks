@@ -33,7 +33,7 @@ func tagIsAllowed(tag atom.Atom) bool {
 		atom.A, atom.Ul, atom.Ol, atom.Sup, atom.Sub, atom.Li, atom.B, atom.I, atom.U, atom.Strong,
 		atom.Em, atom.S, atom.Code, atom.Hr, atom.Br, atom.Div, atom.Table, atom.Thead, atom.Tbody,
 		atom.Tr, atom.Th, atom.Td, atom.Caption, atom.Pre, atom.Span, atom.Font, atom.Img,
-		atom.Details, atom.Summary:
+		atom.Details, atom.Summary, atom.Input:
 		return true
 	default:
 		return false
@@ -42,7 +42,7 @@ func tagIsAllowed(tag atom.Atom) bool {
 
 func isSelfClosing(tag atom.Atom) bool {
 	switch tag {
-	case atom.Img, atom.Br, atom.Hr:
+	case atom.Img, atom.Br, atom.Hr, atom.Input:
 		return true
 	default:
 		return false
@@ -414,24 +414,42 @@ var HTMLSanitizerImgSrcTemplate = "mxc://%s/%s"
 
 func writeImg(w *strings.Builder, attr []html.Attribute) id.ContentURI {
 	src, alt, title, isCustomEmoji, width, height := parseImgAttributes(attr)
+	mxc := id.ContentURIString(src).ParseOrIgnore()
+	if !mxc.IsValid() {
+		w.WriteString("<span")
+		writeAttribute(w, "class", "hicli-inline-img-fallback hicli-invalid-inline-img")
+		w.WriteString(">")
+		writeEscapedString(w, alt)
+		w.WriteString("</span>")
+		return id.ContentURI{}
+	}
+	url := fmt.Sprintf(HTMLSanitizerImgSrcTemplate, mxc.Homeserver, mxc.FileID)
+
+	w.WriteString("<a")
+	writeAttribute(w, "class", "hicli-inline-img-fallback hicli-mxc-url")
+	writeAttribute(w, "title", title)
+	writeAttribute(w, "style", "display: none;")
+	writeAttribute(w, "target", "_blank")
+	writeAttribute(w, "data-mxc", mxc.String())
+	writeAttribute(w, "href", url)
+	w.WriteString(">")
+	writeEscapedString(w, alt)
+	w.WriteString("</a>")
+
 	w.WriteString("<img")
 	writeAttribute(w, "alt", alt)
 	if title != "" {
 		writeAttribute(w, "title", title)
 	}
-	mxc := id.ContentURIString(src).ParseOrIgnore()
-	if !mxc.IsValid() {
-		return id.ContentURI{}
-	}
-	writeAttribute(w, "src", fmt.Sprintf(HTMLSanitizerImgSrcTemplate, mxc.Homeserver, mxc.FileID))
+	writeAttribute(w, "src", url)
 	writeAttribute(w, "loading", "lazy")
 	if isCustomEmoji {
-		writeAttribute(w, "class", "hicli-custom-emoji")
+		writeAttribute(w, "class", "hicli-inline-img hicli-custom-emoji")
 	} else if cWidth, cHeight, sizeOK := calculateMediaSize(width, height); sizeOK {
-		writeAttribute(w, "class", "hicli-sized-inline-img")
+		writeAttribute(w, "class", "hicli-inline-img hicli-sized-inline-img")
 		writeAttribute(w, "style", fmt.Sprintf("width: %.2fpx; height: %.2fpx;", cWidth, cHeight))
 	} else {
-		writeAttribute(w, "class", "hicli-sizeless-inline-img")
+		writeAttribute(w, "class", "hicli-inline-img hicli-sizeless-inline-img")
 	}
 	return mxc
 }
@@ -562,6 +580,17 @@ Loop:
 				}
 			case atom.Code:
 				built.WriteString(`<code class="hicli-inline-code"`)
+			case atom.Input:
+				inputType, ok := getAttribute(token.Attr, "type")
+				if !ok || inputType != "checkbox" {
+					continue
+				}
+				_, checked := getAttribute(token.Attr, "checked")
+				// TODO allow checking checkboxes on own events
+				built.WriteString(`<input type="checkbox" class="hicli-checkbox" disabled`)
+				if checked {
+					built.WriteString(" checked")
+				}
 			default:
 				built.WriteByte('<')
 				built.WriteString(token.Data)

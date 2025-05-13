@@ -20,6 +20,7 @@ import { NonNullCachedEventDispatcher } from "@/util/eventdispatcher.ts"
 import { focused } from "@/util/focus.ts"
 import toSearchableString from "@/util/searchablestring.ts"
 import Subscribable, { MultiSubscribable, NoDataSubscribable } from "@/util/subscribable.ts"
+import { getDisplayname } from "@/util/validation.ts"
 import {
 	ContentURI,
 	EventRowID,
@@ -55,6 +56,7 @@ export interface RoomListEntry {
 	unread_notifications: number
 	unread_highlights: number
 	marked_unread: boolean
+	is_invite?: boolean
 }
 
 export interface GCSettings {
@@ -176,9 +178,13 @@ export class StateStore {
 
 	#shouldHideRoom(entry: SyncRoom): boolean {
 		const cc = entry.meta.creation_content
-		if ((cc?.type ?? "") !== "") {
+		switch (cc?.type ?? "") {
+		default:
 			// The room is not a normal room
 			return true
+		case "":
+		case "support.feline.policy.lists.msc.v1":
+		case "org.matrix.msc3417.call":
 		}
 		const replacementRoom = entry.meta.tombstone?.replacement_room
 		if (
@@ -200,6 +206,8 @@ export class StateStore {
 			entry.meta.unread_highlights !== oldEntry.meta.current.unread_highlights ||
 			entry.meta.marked_unread !== oldEntry.meta.current.marked_unread ||
 			entry.meta.preview_event_rowid !== oldEntry.meta.current.preview_event_rowid ||
+			entry.meta.name !== oldEntry.meta.current.name ||
+			entry.meta.avatar !== oldEntry.meta.current.avatar ||
 			(entry.events ?? []).findIndex(evt => evt.rowid === entry.meta.preview_event_rowid) !== -1
 	}
 
@@ -255,8 +263,10 @@ export class StateStore {
 	}
 
 	applySync(sync: SyncCompleteData) {
+		let prevActiveRoom: RoomID | null = null
 		if (sync.clear_state && this.rooms.size > 0) {
 			console.info("Clearing state store as sync told to reset and there are rooms in the store")
+			prevActiveRoom = this.activeRoomID
 			this.clear()
 		}
 		const resyncRoomList = this.roomList.current.length === 0
@@ -387,6 +397,10 @@ export class StateStore {
 			this.topLevelSpaces.emit(sync.top_level_spaces)
 			this.spaceOrphans.children = sync.top_level_spaces.map(child_id => ({ child_id }))
 		}
+		if (prevActiveRoom) {
+			// TODO this will fail if the room is not in the top 100 recent rooms
+			this.switchRoom?.(prevActiveRoom)
+		}
 	}
 
 	invalidateEmojiPackKeyCache() {
@@ -494,7 +508,7 @@ export class StateStore {
 		const memberEvt = room.getStateEvent("m.room.member", evt.sender)
 		const icon = `${getAvatarThumbnailURL(evt.sender, memberEvt?.content)}&image_auth=${this.imageAuthToken}`
 		const roomName = room.meta.current.name ?? "Unnamed room"
-		const senderName = memberEvt?.content.displayname ?? evt.sender
+		const senderName = getDisplayname(evt.sender, memberEvt?.content)
 		const title = senderName === roomName ? senderName : `${senderName} (${roomName})`
 		if (sound) {
 			(document.getElementById("default-notification-sound") as HTMLAudioElement)?.play()

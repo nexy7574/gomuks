@@ -1,9 +1,25 @@
 div.right-panel-content.widget, div.right-panel-content.element-call {
 	overflow: hidden !important;
 
-	> iframe.widget-iframe {
-		width: 100%;
-		height: 100%;
-		border: none;
+}
+
+iframe.widget-iframe {
+	width: 100%;
+	height: 100%;
+	border: none;
+}
+
+div.permission-prompt {
+	> h2 {
+		margin: 0;
+	}
+
+	> div.permission-actions {
+		display: flex;
+		justify-content: space-between;
+
+		> button {
+			padding: .5rem 1rem;
+		}
 	}
 }
