@@ -170,6 +170,14 @@ export default abstract class RPCClient {
 		return this.request("report_event", { room_id, event_id, reason })
 	}
 
+	reportUser(user_id: UserID, reason: string): Promise<boolean> {
+		return this.request("report_user", { user_id, reason })
+	}
+
+	reportRoom(room_id: RoomID, reason: string): Promise<boolean> {
+		return this.request("report_room", { room_id, reason })
+	}
+
 	redactEvent(room_id: RoomID, event_id: EventID, reason: string): Promise<boolean> {
 		return this.request("redact_event", { room_id, event_id, reason })
 	}

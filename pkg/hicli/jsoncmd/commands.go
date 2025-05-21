@@ -25,6 +25,8 @@ const (
 	ReqSendEvent                Name = "send_event"
 	ReqResendEvent              Name = "resend_event"
 	ReqReportEvent              Name = "report_event"
+	ReqReportUser               Name = "report_user"
+	ReqReportRoom               Name = "report_room"
 	ReqRedactEvent              Name = "redact_event"
 	ReqSetState                 Name = "set_state"
 	ReqUpdateDelayedEvent       Name = "update_delayed_event"

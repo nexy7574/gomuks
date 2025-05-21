@@ -58,6 +58,14 @@ func (h *HiClient) handleJSONCommand(ctx context.Context, req *JSONCommand) (any
 		return unmarshalAndCall(req.Data, func(params *jsoncmd.ReportEventParams) (bool, error) {
 			return true, h.Client.ReportEvent(ctx, params.RoomID, params.EventID, params.Reason)
 		})
+	case jsoncmd.ReqReportRoom:
+		return unmarshalAndCall(req.Data, func(params *jsoncmd.ReportRoomParams) (bool, error) {
+			return true, h.Client.ReportRoom(ctx, params.RoomID, params.Reason)
+		})
+	//case jsoncmd.ReqReportUser:
+	//	return unmarshalAndCall(req.Data, func(params *jsoncmd.ReportUserParams) (bool, error) {
+	//		return true, h.Client.ReportUser(ctx, params.UserID, params.Reason)
+	//	})
 	case jsoncmd.ReqRedactEvent:
 		return unmarshalAndCall(req.Data, func(params *jsoncmd.RedactEventParams) (*mautrix.RespSendEvent, error) {
 			return h.Client.RedactEvent(ctx, params.RoomID, params.EventID, mautrix.ReqRedact{

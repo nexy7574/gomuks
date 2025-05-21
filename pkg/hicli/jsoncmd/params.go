@@ -51,6 +51,16 @@ type ReportEventParams struct {
 	Reason  string     `json:"reason"`
 }
 
+type ReportRoomParams struct {
+	RoomID id.RoomID `json:"room_id"`
+	Reason string    `json:"reason"`
+}
+
+type ReportUserParams struct {
+	UserID id.UserID `json:"user_id"`
+	Reason string    `json:"reason"`
+}
+
 type RedactEventParams struct {
 	RoomID  id.RoomID  `json:"room_id"`
 	EventID id.EventID `json:"event_id"`

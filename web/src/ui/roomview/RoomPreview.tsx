@@ -16,13 +16,13 @@
 import { use, useEffect, useState } from "react"
 import { ScaleLoader } from "react-spinners"
 import { getAvatarThumbnailURL, getAvatarURL, getRoomAvatarURL } from "@/api/media.ts"
-import { usePreference } from "@/api/statestore/hooks.ts"
+import { useAccountData, usePreference } from "@/api/statestore/hooks.ts"
 import { InvitedRoomStore } from "@/api/statestore/invitedroom.ts"
-import { RoomID, RoomSummary } from "@/api/types"
+import { IgnoredUsersEventContent, RoomID, RoomSummary } from "@/api/types"
 import { getDisplayname, getServerName } from "@/util/validation.ts"
 import ClientContext from "../ClientContext.ts"
 import MainScreenContext from "../MainScreenContext.ts"
-import { LightboxContext } from "../modal"
+import { ConfirmWithMessageModal, LightboxContext, ModalContext } from "../modal"
 import MutualRooms from "../rightpanel/UserInfoMutualRooms.tsx"
 import ErrorIcon from "@/icons/error.svg?react"
 import GroupIcon from "@/icons/group.svg?react"
@@ -35,14 +35,22 @@ export interface RoomPreviewProps {
 	invite?: InvitedRoomStore
 }
 
+// function reportRoomAndUser(roomID?: RoomID, userID?: string) {
+//
+// }
+
 const RoomPreview = ({ roomID, via, alias, invite }: RoomPreviewProps) => {
 	const client = use(ClientContext)!
+	const openModal = use(ModalContext)
 	const mainScreen = use(MainScreenContext)
 	const [summary, setSummary] = useState<RoomSummary | null>(null)
 	const [loading, setLoading] = useState(false)
 	const [buttonClicked, setButtonClicked] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [knockRequest, setKnockRequest] = useState<string>("")
+	const [willIgnoreUser, setWillIgnoreUser] = useState(false)
+	const [willReportUser, setWillReportUser] = useState(false)
+	const [willReportRoom, setWillReportRoom] = useState(false)
 	const doKnockRoom = () => {
 		setButtonClicked(true)
 		client.rpc.knockRoom(alias || roomID, alias ? undefined : via, knockRequest || undefined).then(
@@ -76,6 +84,16 @@ const RoomPreview = ({ roomID, via, alias, invite }: RoomPreviewProps) => {
 		client.rpc.leaveRoom(roomID).then(
 			() => {
 				console.info("Successfully rejected invite to", roomID)
+				const calls = []
+				if (willIgnoreUser && invite?.invited_by) {
+					doIgnoreUser()
+				}
+				if (willReportUser && invite?.invited_by) {
+					calls.push(doReportUser)
+				}
+				if (willReportRoom) {
+					calls.push(doReportRoom)
+				}
 				mainScreen.clearActiveRoom()
 			},
 			err => {
@@ -83,6 +101,59 @@ const RoomPreview = ({ roomID, via, alias, invite }: RoomPreviewProps) => {
 				setButtonClicked(false)
 			},
 		)
+	}
+	const ignoredUsers = useAccountData(client.store, "m.ignored_user_list") as IgnoredUsersEventContent | null
+	const doIgnoreUser = () => {
+		if (!invite?.invited_by) {
+			console.error("Failed to report - invited by is null.")
+			return
+		}
+		const newIgnoredUsers = { ...(ignoredUsers || { ignored_users: {}}) }
+		newIgnoredUsers.ignored_users[invite.invited_by] = {}
+		client.rpc.setAccountData("m.ignored_user_list", newIgnoredUsers).catch(err => {
+			console.error("Failed to ignore user", err)
+			window.alert(`Failed to ignore ${invite.invited_by}: ${err}`)
+		}).then(() => {
+			console.info("Successfully rejected invite to %s and ignored user %s.", roomID, invite?.invited_by)
+			mainScreen.clearActiveRoom()
+		})
+	}
+	const doReportUser = () => {
+		return openModal({
+			dimmed: true,
+			boxed: true,
+			content: <ConfirmWithMessageModal
+				title="Report User"
+				description="Report this user to your homeserver administrator?"
+				placeholder="Reason for report"
+				confirmButton="Send report"
+				onConfirm={reason => {
+					// For sanity
+					if (!invite?.invited_by) {
+						console.error("Failed to report - invited by is null.")
+						return
+					}
+					client.rpc.reportUser(invite.invited_by, reason)
+						.catch(err => window.alert(`Failed to report user: ${err}`))
+				}}
+			/>,
+		})
+	}
+	const doReportRoom = () => {
+		return openModal({
+			dimmed: true,
+			boxed: true,
+			content: <ConfirmWithMessageModal
+				title="Report Room"
+				description="Report this room to your homeserver administrator?"
+				placeholder="Reason for report"
+				confirmButton="Send report"
+				onConfirm={reason => {
+					client.rpc.reportRoom(roomID, reason)
+						.catch(err => window.alert(`Failed to report room: ${err}`))
+				}}
+			/>,
+		})
 	}
 	useEffect(() => {
 		setSummary(null)
@@ -179,6 +250,17 @@ const RoomPreview = ({ roomID, via, alias, invite }: RoomPreviewProps) => {
 				placeholder="Why do you want to join this room?"
 				value={knockRequest}
 			/>}
+			<div className={"rejecting"}>
+				<span><i>After rejecting:</i></span>
+				<div>
+					<input type={"checkbox"} onChange={(v) => setWillIgnoreUser(v.currentTarget.checked)} checked={willIgnoreUser}/>
+					<label>Ignore user</label>
+				</div>
+				<div>
+					<input type={"checkbox"} onChange={(v) => setWillReportRoom(v.currentTarget.checked)} checked={willReportRoom}/>
+					<label>Report user or room</label>
+				</div>
+			</div>
 			<div className="buttons">
 				{invite && <button
 					disabled={buttonClicked}

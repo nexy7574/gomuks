@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import React, { JSX, use } from "react"
-import { MemDBEvent } from "@/api/types"
+import { MemDBEvent, RoomID, UserID } from "@/api/types"
 import TimelineEvent from "../timeline/TimelineEvent.tsx"
 import { ModalCloseContext } from "./contexts.ts"
 import "./ConfirmModal.css"
 
 export interface ConfirmProps<T extends readonly unknown[] = []> {
 	evt?: MemDBEvent
+	userID?: UserID
+	roomID?: RoomID
 	title: string
 	description?: string | JSX.Element
 	confirmButton: string
