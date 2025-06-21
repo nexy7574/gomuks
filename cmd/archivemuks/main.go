@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.mau.fi/util/exerrors"
@@ -42,6 +43,8 @@ var address = flag.MakeFull("a", "address", "Address to use to connect to the ba
 var username = flag.MakeFull("u", "username", "Username for the backend", "").String()
 var password = flag.MakeFull("p", "password", "Password for the backend", "").String()
 var roomToFetch = flag.MakeFull("r", "room", "Room ID to fetch messages from", "").String()
+var maxMessages = flag.MakeFull("m", "max-messages", "Maximum number of messages to fetch from the room", "0").Int()
+var oldestEvent = flag.MakeFull("e", "oldest-event", "Oldest event ID to fetch from the room", "").String()
 
 var cli *rpc.GomuksRPC
 var initComplete = exsync.NewEvent()
@@ -68,13 +71,28 @@ func main() {
 	_ = initComplete.Wait(ctx)
 
 	taskCtx, cancel := context.WithCancel(ctx)
+	paginationDone := make(chan struct{})
 	if *roomToFetch != "" {
-		go paginateRoom(taskCtx, id.RoomID(*roomToFetch))
+		go paginateRoom(taskCtx, id.RoomID(*roomToFetch), *maxMessages, id.EventID(*oldestEvent), paginationDone)
 	}
+
+	go func() {
+		timer := time.NewTimer(10 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-taskCtx.Done():
+			return
+		case <-timer.C:
+			_, _ = cli.Ping(ctx, &jsoncmd.PingParams{LastReceivedID: cli.LastReqID})
+		}
+	}()
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
+	select {
+	case <-c:
+	case <-taskCtx.Done():
+	}
 	cli.Disconnect()
 	cancel()
 }

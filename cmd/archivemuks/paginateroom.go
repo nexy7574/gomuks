@@ -89,7 +89,10 @@ func findLastRowID(file *os.File) (database.TimelineRowID, error) {
 	return dbEvent.TimelineRowID, nil
 }
 
-func paginateRoom(ctx context.Context, roomID id.RoomID) {
+func paginateRoom(ctx context.Context, roomID id.RoomID, limit int, oldestEventID id.EventID, done chan<- struct{}) {
+	defer func() {
+		done <- struct{}{}
+	}()
 	meta, ok := roomMeta[roomID]
 	if !ok {
 		fmt.Println("Room", roomID, "not found")
@@ -118,6 +121,7 @@ func paginateRoom(ctx context.Context, roomID id.RoomID) {
 	}
 	enc := json.NewEncoder(file)
 	hasMore := true
+	received := 0
 	for hasMore {
 		fmt.Println("Sending pagination request", roomID, maxTimelineID)
 		resp, err := cli.Paginate(ctx, &jsoncmd.PaginateParams{
@@ -139,8 +143,14 @@ func paginateRoom(ctx context.Context, roomID id.RoomID) {
 			continue
 		}
 		fmt.Println("Got", len(resp.Events), "more events, have more:", resp.HasMore)
-		hasMore = resp.HasMore
+		received += len(resp.Events)
+		hasMore = resp.HasMore && (limit <= 0 || received < limit)
 		for _, evt := range resp.Events {
+			if evt.ID == oldestEventID {
+				hasMore = false
+				fmt.Println("Reached oldest event", oldestEventID, "in room", roomID)
+				break
+			}
 			if evt.StateKey != nil {
 				continue
 			}
