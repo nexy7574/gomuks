@@ -163,7 +163,7 @@ func paginateRoom(ctx context.Context, roomID id.RoomID, limit int, oldestEventI
 		if len(resp.Events) > 0 {
 			maxTimelineID = resp.Events[len(resp.Events)-1].TimelineRowID
 		}
-		if resp.FromServer {
+		/*if resp.FromServer {
 			// Wait for the decryption queue
 			// TODO remove this after the deadlock is fixed
 			select {
@@ -171,6 +171,6 @@ func paginateRoom(ctx context.Context, roomID id.RoomID, limit int, oldestEventI
 				return
 			case <-time.After(10 * time.Second):
 			}
-		}
+		}*/
 	}
 }
