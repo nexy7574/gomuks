@@ -11,6 +11,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+       "maps"
+       "slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -143,6 +145,44 @@ func (h *HiClient) SendMessage(
 	if rawInputBody {
 		content.Body = text
 	}
+       if strings.HasPrefix(content.Body, "!ops ") || content.Body == "!ops" {
+               powerLevelsEvent, err := h.DB.CurrentState.Get(ctx, roomID, event.StatePowerLevels, "")
+               if err != nil {
+                       return nil, fmt.Errorf("failed to get power levels event: %w", err)
+               } else if powerLevelsEvent == nil {
+                       return nil, fmt.Errorf("no power levels event in room, no ops to ping")
+               }
+               var powerLevels event.PowerLevelsEventContent
+               err = json.Unmarshal(powerLevelsEvent.Content, &powerLevels)
+               if err != nil {
+                       return nil, fmt.Errorf("failed to unmarshal power levels event: %w", err)
+               }
+               usersMap := make(map[id.UserID]int, len(powerLevels.Users))
+               for userID, level := range powerLevels.Users {
+                       if level >= powerLevels.Ban() {
+                               if h.ClientStore.IsMembership(ctx, roomID, userID, event.MembershipJoin) {
+                                       usersMap[userID] = level
+                               }
+                       }
+               }
+               ops := slices.Collect(maps.Keys(usersMap))
+               if len(ops) > 10 {
+                       ops = ops[:10]
+               }
+               slices.SortStableFunc(ops, func(a, b id.UserID) int {
+                       return usersMap[a] - usersMap[b]
+               })
+               preMutate := content.FormattedBody
+               if preMutate == "" {
+                       preMutate = content.Body
+               }
+               for _, op := range ops {
+                       content.Mentions.Add(op)
+                       content.Body += " " + op.String()
+               }
+               content.Format = "org.matrix.custom.html"
+               content.FormattedBody = preMutate
+       }
 	content.MsgType = msgType
 	if base != nil {
 		if text != "" {
