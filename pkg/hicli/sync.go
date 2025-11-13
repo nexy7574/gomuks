@@ -365,11 +365,13 @@ func (h *HiClient) processSyncJoinedRoom(ctx context.Context, roomID id.RoomID, 
 
 func (h *HiClient) processSyncLeftRoom(ctx context.Context, roomID id.RoomID, room *mautrix.SyncLeftRoom) error {
 	zerolog.Ctx(ctx).Debug().Stringer("room_id", roomID).Msg("Deleting left room")
-	err := h.DB.Room.Delete(ctx, roomID)
-	if err != nil {
-		return fmt.Errorf("failed to delete room: %w", err)
+	if h.DeleteLeftRooms {
+		err := h.DB.Room.Delete(ctx, roomID)
+		if err != nil {
+			return fmt.Errorf("failed to delete room: %w", err)
+		}
 	}
-	err = h.DB.InvitedRoom.Delete(ctx, roomID)
+	err := h.DB.InvitedRoom.Delete(ctx, roomID)
 	if err != nil {
 		return fmt.Errorf("failed to delete invited room: %w", err)
 	}

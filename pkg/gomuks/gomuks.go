@@ -187,6 +187,7 @@ func (gmx *Gomuks) StartClient() {
 		[]byte("meow"),
 		gmx.HandleEvent,
 	)
+	gmx.Client.DeleteLeftRooms = !gmx.Config.Matrix.KeepLeftRooms
 	gmx.Client.LogoutFunc = gmx.Logout
 	httpClient := gmx.Client.Client.Client
 	if runtime.GOOS == "js" {

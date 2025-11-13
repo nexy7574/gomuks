@@ -34,14 +34,15 @@ import (
 )
 
 type HiClient struct {
-	DB          *database.Database
-	CryptoDB    *dbutil.Database
-	Account     *database.Account
-	Client      *mautrix.Client
-	Crypto      *crypto.OlmMachine
-	CryptoStore *crypto.SQLCryptoStore
-	ClientStore *database.ClientStateStore
-	Log         zerolog.Logger
+	DB              *database.Database
+	CryptoDB        *dbutil.Database
+	Account         *database.Account
+	Client          *mautrix.Client
+	Crypto          *crypto.OlmMachine
+	CryptoStore     *crypto.SQLCryptoStore
+	ClientStore     *database.ClientStateStore
+	Log             zerolog.Logger
+	DeleteLeftRooms bool
 
 	Verified bool
 

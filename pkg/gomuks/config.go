@@ -42,7 +42,8 @@ type Config struct {
 }
 
 type MatrixConfig struct {
-	DisableHTTP2 bool `yaml:"disable_http2"`
+	DisableHTTP2  bool `yaml:"disable_http2"`
+	KeepLeftRooms bool `yaml:"keep_left_rooms"`
 }
 
 type PushConfig struct {
